@@ -173,7 +173,7 @@
         <div class="heart">💕</div>
         
         <div id="questionSection">
-            <h1>Vuoi essere il mio Valentino?</h1>
+            <h1>Vuoi essere la mia Valentina?</h1>
             <div class="buttons-container">
                 <button id="siBtn">SÌ</button>
                 <button id="noBtn">NO</button>
@@ -181,8 +181,8 @@
         </div>
 
         <div id="successSection" class="success-message">
-            <h2>Sei il mio Valentino! 🎉</h2>
-            <p>Sei una persona speciale per me ❤️</p>
+            <h2>Ottima scelta! 🎉</h2>
+            <p>Sei speciale per me ❤️</p>
             <div class="hearts-animation">💕 💕 💕</div>
             <button class="reset-btn" onclick="location.reload()">Ricomincia</button>
         </div>
@@ -194,12 +194,11 @@
             "Sicura?",
             "Davvero?",
             "Ci pensi bene?",
+            "Ci hai pensato?",
             "Ultima chance!",
-            "Mi stai ferendo 💔",
-            "Reconsideriamo...",
             "Sei sicura?",
-            "Rifiuti l'amore? 😢",
-            "Pensa bene...",
+            "Sei proprio sicura?",
+            "Pensaci bene...",
             "NO SIGNIFICA SÌ?"
         ];
 
@@ -220,12 +219,21 @@
             noBtn.textContent = phrases[Math.min(clickCount - 1, phrases.length - 1)];
             
             // Aumenta la dimensione del pulsante SÌ
-            const newSize = 120 + (clickCount * 20);
-            siBtn.style.padding = (15 + clickCount * 3) + 'px ' + (30 + clickCount * 5) + 'px';
-            siBtn.style.fontSize = (18 + clickCount * 2) + 'px';
+            //const newSize = 120 + (clickCount * 20);
+            //siBtn.style.padding = (15 + clickCount * 3) + 'px ' + (30 + clickCount * 5) + 'px';
+            //siBtn.style.fontSize = (18 + clickCount * 2) + 'px';
             
             // Rimpicciolisce il pulsante NO
-            const noScale = Math.max(0.6, 1 - (clickCount * 0.1));
+            //const noScale = Math.max(0.6, 1 - (clickCount * 0.1));
+            //noBtn.style.transform = `scale(${noScale})`;
+
+            // Aumenta la dimensione del pulsante SÌ
+            const newSize = 120 + (clickCount * 20);
+            siBtn.style.padding = (15 + clickCount * 8) + 'px ' + (30 + clickCount * 15) + 'px';
+            siBtn.style.fontSize = (18 + clickCount * 5) + 'px';
+            
+            // Rimpicciolisce il pulsante NO
+            const noScale = Math.max(0.4, 1 - (clickCount * 0.25));
             noBtn.style.transform = `scale(${noScale})`;
             
             // Aggiunge un effetto di shake al pulsante NO
