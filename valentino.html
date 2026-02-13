@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vuoi essere il mio Valentino?</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #ff6b9d 0%, #c44569 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            max-width: 400px;
+            width: 100%;
+        }
+
+        .heart {
+            font-size: 60px;
+            margin-bottom: 20px;
+            animation: heartbeat 1.5s infinite;
+        }
+
+        @keyframes heartbeat {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.2);
+            }
+        }
+
+        h1 {
+            color: #c44569;
+            font-size: 28px;
+            margin-bottom: 40px;
+            font-weight: bold;
+        }
+
+        .buttons-container {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 15px 30px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        #siBtn {
+            background: linear-gradient(135deg, #ff6b9d 0%, #c44569 100%);
+            color: white;
+            min-width: 120px;
+        }
+
+        #siBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        #siBtn:active {
+            transform: scale(0.98);
+        }
+
+        #noBtn {
+            background: #e0e0e0;
+            color: #333;
+            min-width: 120px;
+            position: relative;
+        }
+
+        #noBtn:hover {
+            background: #d0d0d0;
+            transform: scale(0.95);
+        }
+
+        .success-message {
+            display: none;
+            animation: slideIn 0.5s ease;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .success-message h2 {
+            color: #c44569;
+            font-size: 32px;
+            margin-bottom: 15px;
+        }
+
+        .success-message p {
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+
+        .hearts-animation {
+            font-size: 40px;
+            margin: 20px 0;
+        }
+
+        .reset-btn {
+            background: #999;
+            color: white;
+            padding: 10px 20px;
+            font-size: 14px;
+        }
+
+        .reset-btn:hover {
+            background: #777;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .heart {
+                font-size: 50px;
+            }
+
+            button {
+                font-size: 16px;
+                padding: 12px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="heart">💕</div>
+        
+        <div id="questionSection">
+            <h1>Vuoi essere il mio Valentino?</h1>
+            <div class="buttons-container">
+                <button id="siBtn">SÌ</button>
+                <button id="noBtn">NO</button>
+            </div>
+        </div>
+
+        <div id="successSection" class="success-message">
+            <h2>Sei il mio Valentino! 🎉</h2>
+            <p>Sei una persona speciale per me ❤️</p>
+            <div class="hearts-animation">💕 💕 💕</div>
+            <button class="reset-btn" onclick="location.reload()">Ricomincia</button>
+        </div>
+    </div>
+
+    <script>
+        let clickCount = 0;
+        const phrases = [
+            "Sicura?",
+            "Davvero?",
+            "Ci pensi bene?",
+            "Ultima chance!",
+            "Mi stai ferendo 💔",
+            "Reconsideriamo...",
+            "Sei sicura?",
+            "Rifiuti l'amore? 😢",
+            "Pensa bene...",
+            "NO SIGNIFICA SÌ?"
+        ];
+
+        const noBtn = document.getElementById('noBtn');
+        const siBtn = document.getElementById('siBtn');
+        const questionSection = document.getElementById('questionSection');
+        const successSection = document.getElementById('successSection');
+
+        siBtn.addEventListener('click', function() {
+            questionSection.style.display = 'none';
+            successSection.classList.add('show');
+        });
+
+        noBtn.addEventListener('click', function() {
+            clickCount++;
+            
+            // Cambia il testo del pulsante NO
+            noBtn.textContent = phrases[Math.min(clickCount - 1, phrases.length - 1)];
+            
+            // Aumenta la dimensione del pulsante SÌ
+            const newSize = 120 + (clickCount * 20);
+            siBtn.style.padding = (15 + clickCount * 3) + 'px ' + (30 + clickCount * 5) + 'px';
+            siBtn.style.fontSize = (18 + clickCount * 2) + 'px';
+            
+            // Rimpicciolisce il pulsante NO
+            const noScale = Math.max(0.6, 1 - (clickCount * 0.1));
+            noBtn.style.transform = `scale(${noScale})`;
+            
+            // Aggiunge un effetto di shake al pulsante NO
+            noBtn.style.animation = 'shake 0.3s';
+            setTimeout(() => {
+                noBtn.style.animation = '';
+            }, 300);
+        });
+
+        // Aggiungi l'animazione shake
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes shake {
+                0%, 100% { transform: translateX(0) scale(${Math.max(0.6, 1 - (clickCount * 0.1))}); }
+                25% { transform: translateX(-5px) scale(${Math.max(0.6, 1 - (clickCount * 0.1))}); }
+                75% { transform: translateX(5px) scale(${Math.max(0.6, 1 - (clickCount * 0.1))}); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
