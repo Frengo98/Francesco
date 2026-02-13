@@ -221,6 +221,10 @@
         siBtn.addEventListener('click', function() {
             questionSection.style.display = 'none';
             successSection.classList.add('show');
+
+            // Riproduci l'audio
+            const audio = document.getElementById('successAudio');
+            audio.play();
         });
 
         noBtn.addEventListener('click', function() {
