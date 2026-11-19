@@ -8,6 +8,7 @@ const historicalFields = [
 let toastTimer;
 let entryPlayerSignature = null;
 let historicalSignature = null;
+let editingMatchId = null;
 const playerSort = { key: "totalScore", direction: "desc" };
 const latestMatchSort = { key: "totalScore", direction: "desc" };
 
@@ -21,7 +22,9 @@ async function request(path, options = {}) {
     if (response.status === 401 && path !== "/api/login") {
       state.token = "";
       sessionStorage.removeItem("adminToken");
+      resetMatchForm();
       renderAccess();
+      renderMatches();
     }
     throw new Error(result.error || "Si è verificato un errore.");
   }
@@ -153,8 +156,11 @@ function renderEntryList() {
     list.innerHTML = '<p class="empty-note">Aggiungi prima i giocatori alla rosa.</p>';
     return;
   }
+  const players = [...state.data.players].sort((first, second) =>
+    `${first.firstName} ${first.lastName}`.localeCompare(`${second.firstName} ${second.lastName}`, "it", { sensitivity: "base" }),
+  );
   list.innerHTML = `<div class="entry-labels"><span>Giocatore</span><span>Squadra</span><span>Gol</span><span>Ass.</span><span>Aut.</span><span>MVP</span></div>` +
-    state.data.players.map((player) => `<div class="entry-row" data-player-id="${escapeHtml(player.id)}">
+    players.map((player) => `<div class="entry-row" data-player-id="${escapeHtml(player.id)}">
       <label class="entry-player"><input class="entry-selected" type="checkbox"><span>${escapeHtml(player.firstName)} ${escapeHtml(player.lastName)}</span></label>
       <select class="entry-team" aria-label="Squadra di ${escapeHtml(player.firstName)} ${escapeHtml(player.lastName)}"><option value="A">Squadra A</option><option value="B">Squadra B</option></select>
       <input class="entry-goals" type="number" min="0" value="0" aria-label="Gol">
@@ -216,10 +222,14 @@ function renderMatches() {
         <ul class="match-player-list">${players}</ul>
       </section>`;
     }).join("");
+    const editButton = state.token
+      ? `<button class="button button-quiet edit-match" type="button" data-edit-match-id="${escapeHtml(match.id)}">Modifica partita</button>`
+      : "";
     return `<article class="match-card">
       <div class="match-card-top"><span>${escapeHtml(formatDate(match.date))}</span><span>${match.entries.length} ${match.entries.length === 1 ? "presenza" : "presenze"}</span></div>
       <div class="match-score">${match.scoreA}<span>Squadra A&nbsp; — &nbsp;Squadra B</span>${match.scoreB}</div>
       <div class="match-teams">${teams}</div>
+      ${editButton}
     </article>`;
   }).join("");
 }
@@ -298,6 +308,44 @@ function render() {
   renderMatches();
 }
 
+function resetMatchForm() {
+  const matchForm = $("#match-form");
+  matchForm.reset();
+  matchForm.elements.date.value = new Date().toISOString().slice(0, 10);
+  matchForm.elements.scoreA.value = 0;
+  matchForm.elements.scoreB.value = 0;
+  $("#match-form-title").textContent = "Registra una partita";
+  $("#match-form-description").textContent = "Risultato e statistiche individuali.";
+  $("#save-match").textContent = "Salva partita";
+  $("#cancel-match-edit").classList.add("hidden");
+  editingMatchId = null;
+}
+
+function editMatch(matchId) {
+  const match = state.data.matches.find((item) => item.id === matchId);
+  if (!match) return;
+  renderEntryList();
+  const matchForm = $("#match-form");
+  matchForm.elements.date.value = match.date;
+  matchForm.elements.scoreA.value = match.scoreA;
+  matchForm.elements.scoreB.value = match.scoreB;
+  $("#entry-list").querySelectorAll(".entry-row").forEach((row) => {
+    const entry = match.entries.find((item) => item.playerId === row.dataset.playerId);
+    row.querySelector(".entry-selected").checked = Boolean(entry);
+    row.querySelector(".entry-team").value = entry ? entry.team : "A";
+    row.querySelector(".entry-goals").value = entry ? entry.goals : 0;
+    row.querySelector(".entry-assists").value = entry ? entry.assists : 0;
+    row.querySelector(".entry-own-goals").value = entry ? entry.ownGoals : 0;
+    row.querySelector(".entry-mvp").checked = Boolean(entry && entry.mvp);
+  });
+  editingMatchId = match.id;
+  $("#match-form-title").textContent = "Modifica partita";
+  $("#match-form-description").textContent = "Correggi il risultato o le statistiche registrate.";
+  $("#save-match").textContent = "Salva modifiche";
+  $("#cancel-match-edit").classList.remove("hidden");
+  matchForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 async function loadData() {
   state.data = await request("/api/data");
   render();
@@ -308,7 +356,9 @@ $("#login-close").addEventListener("click", () => $("#login-dialog").close());
 $("#logout").addEventListener("click", () => {
   state.token = "";
   sessionStorage.removeItem("adminToken");
+  resetMatchForm();
   renderAccess();
+  renderMatches();
   showToast("Sei uscito dalla modalità gestione.");
 });
 $("#login-form").addEventListener("submit", async (event) => {
@@ -354,16 +404,19 @@ $("#match-form").addEventListener("submit", async (event) => {
     mvp: row.querySelector(".entry-mvp").checked,
   }));
   try {
-    state.data = await request("/api/matches", { method: "POST", body: JSON.stringify({
+    const path = editingMatchId ? `/api/matches/${encodeURIComponent(editingMatchId)}` : "/api/matches";
+    state.data = await request(path, { method: editingMatchId ? "PUT" : "POST", body: JSON.stringify({
       date: form.get("date"), scoreA: form.get("scoreA"), scoreB: form.get("scoreB"), entries,
     }) });
-    matchForm.reset();
-    matchForm.elements.date.value = new Date().toISOString().slice(0, 10);
-    matchForm.elements.scoreA.value = 0;
-    matchForm.elements.scoreB.value = 0;
+    const wasEditing = Boolean(editingMatchId);
+    resetMatchForm();
     render();
-    showToast("Partita registrata e file Excel aggiornato.");
+    showToast(wasEditing ? "Partita aggiornata e file Excel aggiornato." : "Partita registrata e file Excel aggiornato.");
   } catch (error) { showToast(error.message, true); }
+});
+$("#cancel-match-edit").addEventListener("click", () => {
+  resetMatchForm();
+  showToast("Modifica annullata.");
 });
 $("#historical-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -410,6 +463,10 @@ $("#latest-match-ranking").addEventListener("click", (event) => {
 $("#players-table").addEventListener("click", (event) => {
   const button = event.target.closest("[data-player-id]");
   if (button) showPlayerHistory(button.dataset.playerId);
+});
+$("#matches-list").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-edit-match-id]");
+  if (button && state.token) editMatch(button.dataset.editMatchId);
 });
 $("#player-search").addEventListener("input", renderPlayers);
 $("#close-history").addEventListener("click", () => $("#player-history").classList.add("hidden"));

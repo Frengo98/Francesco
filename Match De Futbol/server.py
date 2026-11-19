@@ -10,7 +10,7 @@ import zipfile
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 from xml.sax.saxutils import escape
 
 
@@ -402,6 +402,25 @@ def make_handler(app):
             except Exception as error:
                 self.report_failure(error)
 
+        def do_PUT(self):
+            try:
+                with app.lock:
+                    path = urlsplit(self.path).path
+                    match_prefix = "/api/matches/"
+                    if not path.startswith(match_prefix) or not path[len(match_prefix):]:
+                        self.send_json(404, {"error": "Risorsa non trovata."})
+                        return
+                    if not self.is_admin():
+                        self.send_json(401, {"error": "Accesso amministratore richiesto."})
+                        return
+                    body = self.read_json()
+                    if not isinstance(body, dict):
+                        self.send_json(400, {"error": "Richiesta non valida."})
+                        return
+                    self.update_match(body, unquote(path[len(match_prefix):]))
+            except Exception as error:
+                self.report_failure(error)
+
         def save_historical_totals(self, body):
             try:
                 match_count = parse_non_negative_integer(body.get("matchCount"))
@@ -485,6 +504,25 @@ def make_handler(app):
             self.send_json(201, client_data(app.state))
 
         def add_match(self, body):
+            self.save_match(body)
+
+        def update_match(self, body, match_id):
+            self.save_match(body, match_id)
+
+        def save_match(self, body, match_id=None):
+            match_index = None
+            if match_id is not None:
+                match_index = next(
+                    (
+                        index for index, match in enumerate(app.state["matches"])
+                        if match["id"] == match_id
+                    ),
+                    None,
+                )
+                if match_index is None:
+                    self.send_json(404, {"error": "Partita non trovata."})
+                    return
+
             date = body.get("date")
             try:
                 parsed_date = datetime.strptime(str(date), "%Y-%m-%d")
@@ -546,18 +584,20 @@ def make_handler(app):
                 return
 
             candidate = copy.deepcopy(app.state)
-            candidate["matches"].append(
-                {
-                    "id": secrets.token_hex(16),
-                    "date": parsed_date.strftime("%Y-%m-%d"),
-                    "scoreA": score_a,
-                    "scoreB": score_b,
-                    "entries": clean_entries,
-                }
-            )
+            match = {
+                "id": match_id or secrets.token_hex(16),
+                "date": parsed_date.strftime("%Y-%m-%d"),
+                "scoreA": score_a,
+                "scoreB": score_b,
+                "entries": clean_entries,
+            }
+            if match_index is None:
+                candidate["matches"].append(match)
+            else:
+                candidate["matches"][match_index] = match
             app.save_state(candidate)
             app.state = candidate
-            self.send_json(201, client_data(app.state))
+            self.send_json(200 if match_id is not None else 201, client_data(app.state))
 
         def report_failure(self, error):
             traceback.print_exception(type(error), error, error.__traceback__)
@@ -602,6 +642,150 @@ def main():
     finally:
         server.server_close()
 
+def dispatch_request(app, method, raw_path, headers, body_bytes):
+    path = urlsplit(raw_path).path
+    method = method.upper()
+    norm_headers = {k.lower(): v for k, v in headers.items()}
+
+    def json_response(status, payload):
+        raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        return status, [("Content-Type", "application/json; charset=utf-8")], raw
+
+    def static_response(rel_name):
+        file_path = (PUBLIC / rel_name).resolve()
+        if PUBLIC.resolve() not in file_path.parents or not file_path.is_file():
+            return json_response(404, {"error": "Risorsa non trovata."})
+        mime_types = {
+            ".html": "text/html; charset=utf-8",
+            ".css": "text/css; charset=utf-8",
+            ".js": "text/javascript; charset=utf-8",
+        }
+        ctype = mime_types.get(file_path.suffix, "application/octet-stream")
+        return 200, [("Content-Type", ctype)], file_path.read_bytes()
+
+    try:
+        with app.lock:
+            if method == "GET":
+                if path == "/api/data":
+                    return json_response(200, client_data(app.state))
+                if path == "/":
+                    return static_response("index.html")
+                if path in ("/app.js", "/style.css"):
+                    return static_response(path.lstrip("/"))
+                return json_response(404, {"error": "Risorsa non trovata."})
+
+            if method == "POST":
+                if path == "/api/login":
+                    data = json.loads(body_bytes.decode("utf-8"))
+                    if not isinstance(data, dict) or data.get("password") != app.admin_password:
+                        return json_response(401, {"error": "Password non corretta."})
+                    token = secrets.token_hex(16)
+                    app.tokens.add(token)
+                    return json_response(200, {"token": token})
+
+                if path not in ("/api/players", "/api/matches", "/api/historical"):
+                    return json_response(404, {"error": "Risorsa non trovata."})
+
+                token = norm_headers.get("x-admin-token", "")
+                if not token or token not in app.tokens:
+                    return json_response(401, {"error": "Accesso amministratore richiesto."})
+
+                data = json.loads(body_bytes.decode("utf-8"))
+                if not isinstance(data, dict):
+                    return json_response(400, {"error": "Richiesta non valida."})
+
+                captured = {}
+                helper_cls = make_handler(app)
+                handler_obj = object.__new__(helper_cls)
+                handler_obj.send_json = lambda status, value: captured.update(
+                    {"resp": json_response(status, value)}
+                )
+
+                if path == "/api/players":
+                    handler_obj.add_player(data)
+                elif path == "/api/historical":
+                    handler_obj.save_historical_totals(data)
+                elif path == "/api/matches":
+                    handler_obj.add_match(data)
+
+                return captured.get(
+                    "resp", json_response(500, {"error": "Errore imprevisto."})
+                )
+
+            if method == "PUT":
+                match_prefix = "/api/matches/"
+                if not path.startswith(match_prefix) or not path[len(match_prefix):]:
+                    return json_response(404, {"error": "Risorsa non trovata."})
+
+                token = norm_headers.get("x-admin-token", "")
+                if not token or token not in app.tokens:
+                    return json_response(401, {"error": "Accesso amministratore richiesto."})
+
+                data = json.loads(body_bytes.decode("utf-8"))
+                if not isinstance(data, dict):
+                    return json_response(400, {"error": "Richiesta non valida."})
+
+                captured = {}
+                helper_cls = make_handler(app)
+                handler_obj = object.__new__(helper_cls)
+                handler_obj.send_json = lambda status, value: captured.update(
+                    {"resp": json_response(status, value)}
+                )
+
+                match_id = unquote(path[len(match_prefix):])
+                handler_obj.update_match(data, match_id)
+
+                return captured.get(
+                    "resp", json_response(500, {"error": "Errore imprevisto."})
+                )
+
+            return json_response(405, {"error": "Metodo non consentito."})
+
+    except Exception as error:
+        traceback.print_exception(type(error), error, error.__traceback__)
+        return json_response(500, {"error": "Errore durante l'elaborazione della richiesta."})
+
+
+def create_wsgi_app(data_directory, admin_password):
+    app_instance = App(data_directory, admin_password)
+
+    def application(environ, start_response):
+        method = environ.get("REQUEST_METHOD", "GET")
+        path_info = environ.get("PATH_INFO", "/")
+        query_string = environ.get("QUERY_STRING", "")
+        full_path = f"{path_info}?{query_string}" if query_string else path_info
+
+        try:
+            length = int(environ.get("CONTENT_LENGTH") or "0")
+        except ValueError:
+            length = 0
+        body_bytes = environ["wsgi.input"].read(length) if length > 0 else b""
+
+        headers = {}
+        for key, value in environ.items():
+            if key.startswith("HTTP_"):
+                header_name = key[5:].replace("_", "-").lower()
+                headers[header_name] = value
+
+        status, resp_headers, body = dispatch_request(
+            app_instance, method, full_path, headers, body_bytes
+        )
+        status_text = {
+            200: "200 OK",
+            201: "201 Created",
+            400: "400 Bad Request",
+            401: "401 Unauthorized",
+            404: "404 Not Found",
+            405: "405 Method Not Allowed",
+            409: "409 Conflict",
+            500: "500 Internal Server Error",
+        }.get(status, f"{status} Status")
+
+        final_headers = list(resp_headers) + [("Content-Length", str(len(body)))]
+        start_response(status_text, final_headers)
+        return [body]
+
+    return application
 
 if __name__ == "__main__":
     main()

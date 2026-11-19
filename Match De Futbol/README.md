@@ -18,7 +18,7 @@ I dati vengono salvati in `app\data\partite.json` e aggiornati a ogni modifica n
 
 ## Accesso da Internet tramite link (temporaneo)
 
-Puoi condividere l'app senza acquistare un dominio usando un [Cloudflare Quick Tunnel](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/). Installa `cloudflared`, poi apri due finestre del Prompt dei comandi nella cartella `app`:
+Puoi condividere l'app senza acquistare un dominio usando un [Cloudflare Quick Tunnel](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/). Installa `cloudflared`, poi apri due finestre del Prompt dei comandi nella cartella 
 
 1. Nella prima finestra avvia l'app sul computer locale:
 
@@ -45,6 +45,8 @@ Nel riepilogo generale il numero di partite include sia quelle pregresse sia que
 Per ogni giocatore, le presenze pregresse devono essere uguali alla somma di vittorie, sconfitte e pareggi; il salvataggio segnala i valori incoerenti. Il punteggio totale assegna 3 punti per vittoria, 2 per MVP e 1 per pareggio. La classifica mostra la posizione calcolata in base al punteggio totale; a pari punti i giocatori condividono la posizione. Le intestazioni della classifica sono selezionabili per ordinare ciascuna colonna in ordine crescente o decrescente. La mini classifica mostra le statistiche della partita dettagliata con la data più recente e si aggiorna quando registri nuove partite.
 
 Nella sezione **Ultime partite**, ogni gara mostra la composizione di entrambe le squadre e, per ciascun giocatore presente, gol, assist, autogol ed eventuale MVP.
+
+In modalità amministratore puoi modificare una partita già registrata con il pulsante **Modifica partita** nella scheda della gara: data, risultato, squadre e statistiche aggiornano anche la classifica e il file Excel. Nel modulo di registrazione i giocatori sono elencati in ordine alfabetico per nome e cognome.
 
 ## Accesso solo in rete locale (facoltativo)
 
